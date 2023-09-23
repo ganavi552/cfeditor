@@ -1,0 +1,434 @@
+import React, { useEffect, useState ,useRef} from 'react';
+
+import { saveAs } from 'file-saver';
+
+import AceScreen from "./AceScreen"
+import CodeEditor from './CodeEditor';
+import NavBar from './NavBar';
+import AceEditor from 'react-ace'
+import ace from 'brace' 
+import 'ace-builds/src-noconflict/mode-asciidoc'; // For plain text mode
+
+import { Range } from "ace-builds"
+
+import 'ace-builds/src-noconflict/theme-monokai';
+const maxCSize = 1*1024*1024;
+// const maxCSize = 300800
+var start=0;
+var counter=0;
+var end=maxCSize
+var fd;
+var  dataSize=0;
+var previous=1;
+var remainData=new Array();
+var chunks=new Array();
+var sb=1;
+var chunkSize=3;
+var numChunks=1;
+var st=new Array();
+var ed=new Array();
+st[1]=0;
+ed[1]=maxCSize;
+var numRecords=new Array();
+var currentPage=0;
+numRecords[0]=0;
+const FileEditor = () => {
+  const editorRef = useRef();
+  const [pages, setPages] = useState([]);
+  const [fileContent, setFileContent] = useState('');
+  const [max, setMax] = useState(0);
+  const [flag,setFlag]=useState(false)
+  const [fileBlob,setFileBlob]=useState(null);
+
+  var output;
+  var vb = false;
+
+ 
+  let utf2ELoopup = new Array (
+    0,1,2,3,55,45,46,47,22,5,21,11,12,13,14,15,16,17,18,19,60,61,50,38,24,25,63,39,28,29,30,31,64,90,127,123,91,108,80,125,77,93,92,78,107,96,75,97,240,241,242,243,244,245,246,247,248,249,122,94,76,126,110,111,124,193,194,195,196,197,198,199,200,201,209,210,211,212,213,214,215,216,217,226,227,228,229,230,231,232,233,173,224,189,95,109,121,129,130,131,132,133,134,135,136,137,145,146,147,148,149,150,151,152,153,162,163,164,165,166,167,168,169,192,79,208,161,7,32,33,34,35,36,37,6,23,40,41,42,43,44,9,10,27,48,49,26,51,52,53,54,8,56,57,58,59,4,20,62,255,65,170,74,177,159,178,106,181,187,180,154,138,176,202,175,188,144,143,234,250,190,160,182,179,157,218,155,139,183,184,185,171,100,101,98,102,99,103,158,104,116,113,114,115,120,117,118,119,172,105,237,238,235,239,236,191,128,253,254,251,252,186,174,89,68,69,66,70,67,71,156,72,84,81,82,83,88,85,86,87,140,73,205,206,203,207,204,225,112,221,222,219,220,141,142,223
+    );
+    // let e2UtfLookup = new Array (
+    // 0,1,2,3,156,9,134,127,151,141,142,11,12,13,14,15,16,17,18,19,157,10,8,135,24,25,146,143,28,29,30,31,128,129,130,131,132,133,23,27,136,137,138,139,140,5,6,7,144,145,22,147,148,149,150,4,152,153,154,155,20,21,158,26,32,160,226,228,224,225,227,229,231,241,162,46,60,40,43,124,38,233,234,235,232,237,238,239,236,223,33,36,42,41,59,94,45,47,194,196,192,193,195,197,199,209,166,44,37,95,62,63,248,201,202,203,200,205,206,207,204,96,58,35,64,39,61,34,216,97,98,99,100,101,102,103,104,105,171,187,240,253,254,177,176,106,107,108,109,110,111,112,113,114,170,186,230,184,198,164,181,126,115,116,117,118,119,120,121,122,161,191,208,91,222,174,172,163,165,183,169,167,182,188,189,190,221,168,175,93,180,215,123,65,66,67,68,69,70,71,72,73,173,244,246,242,243,245,125,74,75,76,77,78,79,80,81,82,185,251,252,249,250,255,92,247,83,84,85,86,87,88,89,90,178,212,214,210,211,213,48,49,50,51,52,53,54,55,56,57,179,219,220,217,218,159
+    // );
+    let e2UtfLookup = new Array (
+      0,1,2,3,156,9,134,127,151,141,142,11,12,13,14,15,16,17,18,19,157,10,8,135,24,25,146,143,28,29,30,31,128,129,130,131,132,133,23,27,136,137,138,139,140,5,6,7,144,145,22,147,148,149,150,4,152,153,154,155,20,21,158,26,32,160,226,228,224,225,227,229,231,241,162,46,60,40,43,124,38,233,234,235,232,237,238,239,236,223,33,36,42,41,59,94,45,47,194,196,192,193,195,197,199,209,166,44,37,95,62,63,248,201,202,203,200,205,206,207,204,96,58,35,64,39,61,34,216,97,98,99,100,101,102,103,104,105,171,187,240,253,254,177,176,106,107,108,109,110,111,112,113,114,170,186,230,184,198,164,181,126,115,116,117,118,119,120,121,122,161,191,208,91,222,174,172,163,165,183,169,167,182,188,189,190,221,168,175,93,180,215,123,65,66,67,68,69,70,71,72,73,173,244,246,242,243,245,125,74,75,76,77,78,79,80,81,82,185,251,252,249,250,255,92,247,83,84,85,86,87,88,89,90,178,212,214,210,211,213,48,49,50,51,52,53,54,55,56,57,179,219,220,217,218,159
+      );
+
+
+  function  convert2Ascii(ebcdicBytes,recordLength){
+    var flag=0;
+    var lines=[];
+    if (ebcdicBytes.length < 4) {
+      lines.push("May not be a valid file");
+      return lines;
+    }
+    // var vb = false;
+    var startIndex = 0;
+    var len = 0;
+    /*
+      read first 4 bytes to figure out if it is variable block file or not
+    */
+      if (recordLength  == 0) {
+        if (ebcdicBytes[3] != 0 || ebcdicBytes[2] != 0) {
+          lines.push("Record length was zero but file was not Variable Block");
+          return lines;
+        }
+        // calculate record length
+        recordLength = getRecordLen(startIndex,ebcdicBytes);
+        if(flag <recordLength){
+         flag=recordLength
+          setMax(recordLength)
+          // console.log(max)
+        }
+        
+        if (recordLength > 32756 || recordLength < 0) {
+          lines.push("Record length was zero but file was not Variable Block");
+          return lines;
+        }
+        vb = true;
+        startIndex = 4; // skip first 4 bytes for VB Files
+        len = 3;
+      }
+    
+    var line = "";
+    
+    var asciiBytes = new Array(ebcdicBytes.length);
+    // ||ebcdicBytes[i]==2
+    let en=recordLength
+    // for (var i = startIndex;i<ebcdicBytes.length && en<ebcdicBytes.length;i++){
+    for (var i = startIndex;i<ebcdicBytes.length ;i++){
+
+      len++;
+      asciiBytes[i] = e2UtfLookup[ebcdicBytes[i]];
+      //utf2ELoopup [asciiBytes[i]]===?16
+      if(ebcdicBytes[i]==10 || ebcdicBytes[i]==13|| ebcdicBytes[i]==2||ebcdicBytes[i]==5||ebcdicBytes[i]==15||ebcdicBytes[i]==4||ebcdicBytes[i]==3){
+
+        asciiBytes[i] = 32;
+
+       
+      }
+    
+      line += String.fromCharCode(asciiBytes[i]);
+ 
+
+      if (len == recordLength) {
+        lines.push(line);
+        line = "";
+        len = 0;
+        if (vb) {
+          recordLength = getRecordLen(i,ebcdicBytes) ;
+          // en=i+recordLength;
+          if(flag <recordLength){
+            flag=recordLength;
+            setMax(recordLength)
+          }      
+          if (recordLength <= 0)
+            break;
+          i+=3; // skip 4 bytes -->  3 + 1 will be added by the for loop
+          len = 3;
+        }
+      }
+      
+    }
+
+    // if(i<ebcdicBytes.length){
+    //   dataSize+=i-4;
+    //   start=dataSize;
+    //   end=start+maxCSize;  
+    // }
+    previous+=lines.length;
+    numRecords[currentPage+1]=previous+1;
+    console.log("record length",numRecords[currentPage+1]);
+      return [lines,flag,recordLength];
+
+  }
+
+  function  getRecordLen(index,ebcdicBytes){
+    var recordLength = 0;
+    if ((index+4) <= ebcdicBytes.length) {
+       recordLength = ((ebcdicBytes[index] & 0xFF) << 8) | (ebcdicBytes[index+1] & 0xFF);
+    }  
+    return recordLength;
+  }
+
+
+const readVB=(ebcdicBytes,recordLength,startIndex )=>{
+ 
+
+  var m=0;
+ 
+   var data= new Array();
+   var st,en;
+      
+   while(m<ebcdicBytes.length){
+     recordLength = getRecordLen(startIndex,ebcdicBytes);
+     //what if reclength 0 ?????
+     
+   
+     en=startIndex+recordLength;
+     if(en<ebcdicBytes.length){
+      m+=recordLength
+     }
+     else{ 
+       dataSize+=m;
+       start=dataSize;
+       end=start+maxCSize;
+       break;         
+     }
+     startIndex=m;
+   }
+ 
+   
+   //when recLen is 0??????
+           
+ return [ebcdicBytes.slice(0,m),m];
+       }
+
+
+
+      const handler=(fileBlob)=>{
+        console.log("ENTERING HANDLER**********************************************")
+        console.log(fileBlob);
+        var promise = new Promise(getBuffer(fileBlob));
+        // Wait for promise to be resolved, or log error.
+        promise.then(function(data) {
+         var recLen = 0;
+        
+         st[currentPage]=start;
+         ed[currentPage]=end
+       ;
+         var [dataRec,l]=readVB(data,recLen,0);
+         
+        //  end=l;
+          const [lines,flag,recordLength] = convert2Ascii(dataRec,recLen);
+
+
+
+          output="";
+          for (var j =0; j < lines.length;j++){
+           output+= lines[j]+"\n";
+          }
+      
+          setFileContent(output)
+          // loadPage(output);
+          currentPage+=1
+        
+      if(vb==true){
+        setMax(flag);
+        setFlag(vb)
+      }
+      else{
+        setMax(recordLength);
+        setFlag(vb)
+      }
+        }).catch(function(err) {
+        });
+      
+      
+      function getBuffer(fileData) {
+      
+        return function(resolve) {
+            var reader = new FileReader();
+            let slice = fileData.slice(start, end);
+            reader.readAsArrayBuffer(slice);
+            reader.onload = function() {
+              var arrayBuffer = reader.result
+              var bytes = new Uint8Array(arrayBuffer);
+              resolve(bytes);
+            }
+        }
+
+      //  return async (file) => {
+        //   let count = 1;
+        //   const stream = fileData.stream().pipeThrough(new TextDecoderStream());
+        //   const reader = stream.getReader();
+        // console.log("reader",stream)
+          // try {
+          //   while (true) {
+          //     const { done, value } = reader.read();
+          //     if (done) break;
+          //     console.log(done)
+          //     console.log(value)
+          //     const lineBreaks = (value.match(/\n/g) || []).length;
+          //     count += lineBreaks;
+          //   }
+          // } finally {
+          //   reader.releaseLock();
+          // }
+        // console.log("count",count)
+        //   return count;
+        
+        
+      }
+      }
+ 
+  const handleFileUpload = (fileData,recLength) => {
+
+   let fd=fileData[0]
+    setFileBlob(fd);
+    handler(fd);
+};
+
+  const handleSaveFile = () => {
+    const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
+    saveAs(blob, 'uploaded-file.txt');
+
+  };
+  
+ 
+
+
+  useEffect(()=>{
+    loadPage(0)
+
+  },[fileContent])
+
+
+  // useEffect(() => {
+  //   // Update editor options when vb changes
+  //   if (!vb) {
+  //     editorRef.current.editor.session.setOption("wrap", max + 3);
+  //   } else {
+  //     editorRef.current.editor.session.setOption("wrap", max);
+  //   }
+  // }, [ max]);
+
+
+
+  const loadPage = (page) => {
+   var pageContent=fileContent;
+   if(pageContent!="" && pageContent!="   \n") {
+ if(sb==1){
+  chunks.push(pageContent) 
+  console.log("*********no of chunk ", chunks.length, currentPage ,"**********************")
+    setPages((prevPages) => [ chunks]);
+ }
+  else if(sb==2){ 
+      if(chunks.length<chunkSize){ 
+      numChunks++;
+      chunks.push(pageContent)
+      console.log("*********no of chunk ", chunks.length, currentPage ,"**********************")
+    setPages((prevPages) => [ chunks]);
+    }else{
+      counter+=2;
+      // chunks=chunks.slice(2)//removing starting  2 chunks
+      chunks.splice(1,2)
+      console.log("*********no of chunk ", chunks.length, currentPage  ,"**********************")
+      numChunks=numChunks-2;//-3+1=-2
+      chunks.push(pageContent)
+      console.log("*********no of chunk ", chunks.length, currentPage  ,"**********************")
+      console.log(chunks);
+      setPages((prevPages) => [ chunks]);
+      
+      console.log("line number of chunk",numRecords[counter])
+      editorRef.current.editor.setOption("firstLineNumber", numRecords[counter])
+    }
+  }
+  else if(sb==3){//scroll thumb is moving upside=>what to do????
+
+  }
+
+   }
+ 
+  
+  };
+
+
+
+
+
+
+
+
+  const handleScroll = () => {
+    const editor = editorRef.current.editor;
+    const scrollTop = editor.getSession().getScrollTop();
+  
+    // const scrollHeight = editor.getSession().getDocument().getLength() * editor.renderer.lineHeight;
+    const scrollHeight =editor.getSession().documentToScreenPosition(editor.getSession().getDocument().getLength(), 0).row * editor.renderer.lineHeight + editor.renderer.scrollBar.getWidth()
+    const viewHeight = editor.renderer.$size.height;
+
+   
+    if (scrollTop + viewHeight >= scrollHeight-200) {
+      // User is near the bottom, load the next page
+      // loadPage(1);
+    
+      console.log("HANDLER ***************************************************************",scrollTop,scrollHeight,viewHeight)
+      sb=2;
+      
+      handler(fileBlob);
+
+      console.log("BELOW HANDLE*************************************************",scrollTop,scrollHeight,viewHeight)
+    }
+      
+    // } else if (scrollTop === 0 && currentPage > 1) {
+    //   // User is near the top and scrolling up, load the previous page
+    //   setCurrentPage((prevPage) => prevPage - 1);
+    //   //need to see once
+
+    // }
+
+
+  };
+
+  useEffect(() => {
+    if (editorRef.current) {
+      // Check if the editorRef has a current value
+      const editor = editorRef.current.editor; // Access the Ace Editor instance
+
+      // Attach an event listener for gutter click
+      editor.on('guttermousedown', (event) => {
+        const target = event.domEvent.target;
+        if (target.classList.contains('ace_gutter-cell')) {
+          // Check if the clicked element is in the gutter
+          const lineNumber = event.getDocumentPosition().row;
+          console.log('Clicked line number:', lineNumber + 1);
+          let content=editor. session. getLine(lineNumber);
+          // editorRef.current.editor.session.setOption("wrap", 8);
+          console.log("line content",content)
+          let range=editorRef.current.editor.find(editorRef.current.editor.session.getLine(lineNumber))
+          // if(content.length<=8){
+          //   editor.session.replace(range , "textgdhhhhhhhhhhhhhhhhhhhhhhhhh");
+          // }
+          // else{
+          //   editor.session.replace(range , "text");
+          // }
+        }
+      });
+    }
+  }, []);
+
+  return (
+    <div style={{paddingRight:0, width:'100%'}}>
+
+      <NavBar handler={handleFileUpload}/>
+
+      <div id="editor" >
+
+     
+      <AceEditor
+        mode="asciidoc"
+        highlightActiveLine={true}
+        value={pages.join("")} // Combine the content of all loaded pages
+        showPrintMargin={false}
+        scrollMargin={true}
+        height="93.6vh"
+        width="100%"
+        fontSize={18}
+        ref={editorRef}
+        onScroll={handleScroll}
+        // editorProps={{ $blockScrolling: Infinity }} 
+        setOptions={{
+          enableBasicAutocompletion: true,
+          enableLiveAutocompletion: true,
+          showLineNumbers: true,
+          useWorker: false 
+        }}
+      />
+ 
+
+     </div>
+    </div>
+  );
+};
+export default FileEditor;
