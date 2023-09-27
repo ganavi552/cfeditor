@@ -1,0 +1,743 @@
+// import React, { useEffect, useState, useRef } from "react";
+
+// import NavBar from "./NavBar";
+// import AceEditor from "react-ace";
+// import "ace-builds/src-noconflict/mode-asciidoc"; // For plain text mode
+// import "ace-builds/src-noconflict/theme-monokai";
+// import { e2UtfLookup } from "../constants/lookup";
+
+// const maxChunkSize = 3 * 1024 * 1024;
+// // const maxChunkSize = 300800
+// let start = 0;
+// let counter = 0;
+// let end = maxChunkSize;
+// let dataSize = 0;
+// let previous = 1;
+// let chunks = [];
+// let scrollEnd = 1;
+// let chunkSize = 3;
+// let st = [];
+// let ed = [];
+// st[1] = 0;
+// ed[1] = maxChunkSize;
+// let numRecords = [];
+// let currentPage = 0;
+// numRecords[0] = 0;
+
+// console.abcd = console.log;
+// console.log = () => null;
+// let reader = new FileReader();
+
+// const FileEditor = () => {
+//   const editorRef = useRef();
+//   const [fileContent, setFileContent] = useState("");
+//   const [fileBlob, setFileBlob] = useState(null);
+
+//   function  convert2Ascii(ebcdicBytes,recordLength){
+//     var flag=0;
+//     var result = [];
+//     var lines=[];
+//     var hexFirst=[];
+//     var hexSecond=[];
+//     if (ebcdicBytes.length < 4) {
+//       result.push("May not be a valid file");
+//       return result;
+//     }
+//     // var vb = false;
+//     var startIndex = 0;
+//     var len = 0;
+//     /*
+//       read first 4 bytes to figure out if it is variable block file or not
+//     */
+//       if (recordLength  == 0) {
+//         if (ebcdicBytes[3] != 0 || ebcdicBytes[2] != 0) {
+//           result.push("Record length was zero but file was not Variable Block");
+//           return result;
+//         }
+//         // calculate record length
+//         recordLength = getRecordLen(startIndex,ebcdicBytes);
+//         if(flag <recordLength){
+//          flag=recordLength
+//           setMax(recordLength)
+//           // console.log(max)
+//         }
+        
+//         if (recordLength > 32756 || recordLength < 0) {
+//           result.push("Record length was zero but file was not Variable Block");
+//           return result;
+//         }
+//         vb = true;
+//         startIndex = 4; // skip first 4 bytes for VB Files
+//         len = 3;
+//       }
+    
+//     var line = "";
+//     var hexaLineFirst="";
+//     var hexaLineSecond="";
+//     var asciiBytes = new Array(ebcdicBytes.length);
+//     // ||ebcdicBytes[i]==2
+//     for (var i = startIndex;i<ebcdicBytes.length;i++){
+//       len++;
+//       asciiBytes[i] = e2UtfLookup[ebcdicBytes[i]];
+//       if(ebcdicBytes[i]==10 || ebcdicBytes[i]==13|| ebcdicBytes[i]==2||ebcdicBytes[i]==5||ebcdicBytes[i]==15||ebcdicBytes[i]==4||ebcdicBytes[i]==3){
+
+//         asciiBytes[i] = 32;
+
+       
+//       }
+    
+//       line += String.fromCharCode(asciiBytes[i]);
+//       let hexa=(ebcdicBytes[i]).toString(16);
+//       hexa=hexa.toUpperCase();
+//       if(hexa.length==1){
+//         hexaLineFirst+=0;
+//         hexaLineSecond+=hexa[0];
+//       }
+//       else{
+//         hexaLineFirst+=hexa[0]
+//         hexaLineSecond+=hexa[1];
+//       }
+
+//       if (len == recordLength) {
+//         lines.push(line);
+//         hexFirst.push(hexaLineFirst);
+//         hexSecond.push(hexaLineSecond);
+//         line = "";
+//         hexaLineFirst="";
+//         hexaLineSecond="";
+//         len = 0;
+//         if (vb) {
+//           recordLength = getRecordLen(i,ebcdicBytes) ;
+//           // console.log(max);
+//           if(flag <recordLength){
+
+// flag=recordLength;
+//             setMax(recordLength)
+//             // console.log(flag);
+//           }
+        
+//           if (recordLength <= 0)
+//             break;
+//           i+=3; // skip 4 bytes -->  3 + 1 will be added by the for loop
+//           len = 3;
+//         }
+//       }
+      
+//     }
+//     previous+=lines.length;
+//     numRecords[currentPage+1]=previous+1;
+//     console.log("record length",numRecords[currentPage+1]);
+//       return [lines,hexFirst,hexSecond,flag,recordLength];
+
+//   }
+//   function getRecordLen(index, ebcdicBytes) {
+//     var recordLength = 0;
+//     if (index + 4 <= ebcdicBytes.length) {
+//       recordLength =
+//         ((ebcdicBytes[index] & 0xff) << 8) | (ebcdicBytes[index + 1] & 0xff);
+//     }
+//     return recordLength;
+//   }
+
+//   const readVB = (ebcdicBytes, recordLength, startIndex) => {
+//     let iterator = 0;
+//     let en;
+
+//     while (iterator < ebcdicBytes.length) {
+//       recordLength = getRecordLen(startIndex, ebcdicBytes);
+//       //what if reclength 0 ?????
+
+//       en = startIndex + recordLength;
+//       if (en < ebcdicBytes.length) {
+//         iterator += recordLength;
+//       } else {
+//         dataSize += iterator;
+//         start = dataSize;
+//         end = start + maxChunkSize;
+//         break;
+//       }
+//       startIndex = iterator;
+//     }
+
+//     //when recLen is 0??????
+
+//     return [ebcdicBytes.slice(0, iterator), iterator];
+//   };
+
+//   const handler = (fileBlob) => {
+    
+//     console.log(
+//       "ENTERING HANDLER**********************************************"
+//     );
+//     console.log(fileBlob);
+//     let promise = new Promise(getBuffer(fileBlob));
+//     // Wait for promise to be resolved, or log error.
+//     promise
+//       .then(function (data) {
+//         let recLen = 0;
+//         let output;
+
+//         st[currentPage] = start;
+//         ed[currentPage] = end;
+//         let [dataRec] = readVB(data, recLen, 0);
+
+//         let [lines] = convert2Ascii(dataRec, recLen);
+
+//         dataRec = null;
+//         output = "";
+
+//         for (let j = 0; j < lines.length; j++) {
+//           output += lines[j] + "\n";
+//         }
+
+//         setFileContent(output);
+//         lines = [];
+//         // loadPage(output);
+//         currentPage += 1;
+//       })
+//       .catch(function (err) {});
+
+//     function getBuffer(fileData) {
+//       return function (resolve) {
+//         reader.readAsArrayBuffer(fileData.slice(start, end));
+//         reader.onload = function () {
+//           resolve(new Uint8Array(reader.result));
+//         };
+//       };
+//     }
+//   };
+
+//   const handleFileUpload = (fileData) => {
+//     let ScrollDebounce = true;
+
+//     if (ScrollDebounce) {
+//       ScrollDebounce = false;
+
+//       //do stuff
+
+//       setTimeout(function () {
+//         let fd = fileData[0];
+//         setFileBlob(fd);
+
+//         handler(fd);
+//       }, 500);
+//     }
+//   };
+
+//   // const handleSaveFile = () => {
+//   //   const blob = new Blob([fileContent], { type: "text/plain;charset=utf-8" });
+//   //   saveAs(blob, "uploaded-file.txt");
+//   // };
+
+//   useEffect(() => {
+//     const loadPage = () => {
+//       if (fileContent !== "" && fileContent != "   \n") {
+//         if (scrollEnd === 1) { // user is at chunk 1
+//           //initial
+//           chunks.push(fileContent);
+//           console.log(
+//             "*********no of chunk ",
+//             chunks.length,
+//             currentPage,
+//             "**********************"
+//           );
+//         } else if (scrollEnd === 2) { // user is at chunk 2
+//           //scroll thumb near to bottom
+//           if (chunks.length < chunkSize) {
+//             chunks.push(fileContent);
+//             console.log(
+//               "*********no of chunk ",
+//               chunks.length,
+//               currentPage,
+//               "**********************"
+//             );
+//           } else {
+//             counter += 2;
+//             chunks = [chunks[2]] // chunks.slice(2); //removing starting  2 chunks
+//             console.log(
+//               "*********no of chunk ",
+//               chunks.length,
+//               currentPage,
+//               "**********************"
+//             );
+//             chunks.push(fileContent);
+//             console.log(
+//               "*********no of chunk ",
+//               chunks.length,
+//               currentPage,
+//               "**********************"
+//             );
+            
+//             console.log("line number of chunk", numRecords[counter]);
+//             editorRef.current.editor.setOption(
+//               "firstLineNumber",
+//               numRecords[counter]
+//             );
+//           }
+//         } else if (scrollEnd == 3) {
+//           //scroll thumb is moving upside=>what to do????
+//         }
+
+//         setFileContent("");
+//       }
+//     };
+
+//     loadPage();
+//   }, [fileContent]);
+
+//   // useEffect(() => {
+//   //   // Update editor options when vb changes
+//   //   if (!vb) {
+//   //     editorRef.current.editor.session.setOption("wrap", max + 3);
+//   //   } else {
+//   //     editorRef.current.editor.session.setOption("wrap", max);
+//   //   }
+//   // }, [ max]);
+
+//   function debounce(method, delay) {
+//     clearTimeout(method._tId);
+//     method._tId= setTimeout(function(){
+//         method();
+//     }, delay);
+// }
+
+//   const handleScroll = () => {
+//     const editor = editorRef.current.editor;
+//     const scrollTop = editor.getSession().getScrollTop();
+
+//     // const scrollHeight = editor.getSession().getDocument().getLength() * editor.renderer.lineHeight;
+//     const scrollHeight =
+//       editor
+//         .getSession()
+//         .documentToScreenPosition(
+//           editor.getSession().getDocument().getLength(),
+//           0
+//         ).row *
+//         editor.renderer.lineHeight +
+//       editor.renderer.scrollBar.getWidth();
+//     const viewHeight = editor.renderer.$size.height;
+
+//     if (scrollTop + viewHeight >= scrollHeight - 200) {
+//       // User is near the bottom, load the next page
+//       // loadPage(1);
+
+//       console.log(
+//         "HANDLER ***************************************************************",
+//         scrollTop,
+//         scrollHeight,
+//         viewHeight
+//       );
+//       scrollEnd = 2;
+
+//       handler(fileBlob);
+
+//       console.log(
+//         "BELOW HANDLE*************************************************",
+//         scrollTop,
+//         scrollHeight,
+//         viewHeight
+//       );
+//     }
+
+//     // } else if (scrollTop === 0 && currentPage > 1) {
+//     //   // User is near the top and scrolling up, load the previous page
+//     //   setCurrentPage((prevPage) => prevPage - 1);
+//     //   //need to see once
+
+//     // }
+//   };
+
+
+
+
+//   useEffect(() => {
+//     if (editorRef.current) {
+//       // Check if the editorRef has a current value
+//       const editor = editorRef.current.editor; // Access the Ace Editor instance
+
+//       // Attach an event listener for gutter click
+//       editor.on('guttermousedown', (event) => {
+//         const target = event.domEvent.target;
+//         if (target.classList.contains('ace_gutter-cell')) {
+//           // Check if the clicked element is in the gutter
+//           const lineNumber = event.getDocumentPosition().row;
+//           console.log('Clicked line number:', lineNumber + 1);
+//           let content=editor. session. getLine(lineNumber);
+//           // editorRef.current.editor.session.setOption("wrap", 8);
+//           console.log("line content",content)
+//           let range=editorRef.current.editor.find(editorRef.current.editor.session.getLine(lineNumber))
+//           if(content.length<=8){
+//             editor.session.replace(range , "textgdhhhhhhhhhhhhhhhhhhhhhhhhh");
+//           }
+//           else{
+//             editor.session.replace(range , "text");
+//           }
+//         }
+//       });
+//     }
+//   }, []);
+
+
+
+
+//   console.log("Chukks:",chunks)
+
+//   return (
+//     <div style={{ paddingRight: 0, width: "100%" }}>
+//       <NavBar handler={handleFileUpload} />
+
+//       <div id="editor">
+//         <AceEditor
+//           mode="asciidoc"
+//           highlightActiveLine={true}
+//           // value={pages.join("")} // Combine the content of all loaded pages
+//           value={([chunks] || []).join("")} // Combine the content of all loaded pages
+//           showPrintMargin={false}
+//           scrollMargin={true}
+//           height="93.6vh"
+//           width="100%"
+//           fontSize={18}
+//           ref={editorRef}
+//           onScroll={() => debounce(handleScroll, 2000)}
+//           // editorProps={{ $blockScrolling: Infinity }}
+//           setOptions={{
+//             enableBasicAutocompletion: true,
+//             enableLiveAutocompletion: true,
+//             showLineNumbers: true,
+//             useWorker: false,
+//           }}
+//         />
+//       </div>
+//     </div>
+//   );
+// };
+// export default FileEditor;
+
+
+import React, { useEffect, useState, useRef } from "react";
+
+import NavBar from "./NavBar";
+import AceEditor from "react-ace";
+import "ace-builds/src-noconflict/mode-asciidoc"; // For plain text mode
+import "ace-builds/src-noconflict/theme-monokai";
+import { e2UtfLookup } from "../constants/lookup";
+
+const maxChunkSize = 3 * 1024 * 1024;
+// const maxChunkSize = 300800
+let start = 0;
+let counter = 0;
+let end = maxChunkSize;
+let dataSize = 0;
+let previous = 1;
+let scrollEnd = 1;
+let vb = false;
+let chunkSize = 3;
+let st = [];
+let ed = [];
+st[1] = 0;
+ed[1] = maxChunkSize;
+let numRecords = [];
+let currentPage = 0;
+numRecords[0] = 0;
+
+const FileEditor = () => {
+  const editorRef = useRef();
+  const [fileContent, setFileContent] = useState("");
+  const [fileBlob, setFileBlob] = useState(null);
+  const [chunks, setChunks] = useState([]);
+  const [recLength,setRecLength]=useState(0);
+
+  function convert2Ascii(ebcdicBytes, recordLength) {
+    let flag = 0;
+    let lines = [];
+    let vb = false;
+
+    if (ebcdicBytes.length < 4) {
+      lines.push("May not be a valid file");
+      return lines;
+    }
+
+    let startIndex = 0;
+    let len = 0;
+
+    /*
+      read first 4 bytes to figure out if it is variable block file or not
+    */
+    if (recordLength == 0) {
+      if (ebcdicBytes[3] != 0 || ebcdicBytes[2] != 0) {
+        lines.push("Record length was zero but file was not Variable Block");
+        return lines;
+      }
+      // calculate record length
+      recordLength = getRecordLen(startIndex, ebcdicBytes);
+      if (flag < recordLength) {
+        flag = recordLength;
+      }
+
+      if (recordLength > 32756 || recordLength < 0) {
+        lines.push("Record length was zero but file was not Variable Block");
+        return lines;
+      }
+      vb = true;
+      startIndex = 4; // skip first 4 bytes for VB Files
+      len = 3;
+    }
+
+    let asciiBytes = [];
+
+    let lineChars = [];
+
+    for (let i = startIndex; i < ebcdicBytes.length; i++) {
+      len++;
+      asciiBytes[i] = e2UtfLookup[ebcdicBytes[i]];
+
+      if (
+        ebcdicBytes[i] == 10 ||
+        ebcdicBytes[i] == 13 ||
+        ebcdicBytes[i] == 2 ||
+        ebcdicBytes[i] == 5 ||
+        ebcdicBytes[i] == 15 ||
+        ebcdicBytes[i] == 4 ||
+        ebcdicBytes[i] == 3
+      ) {
+        asciiBytes[i] = 32;
+      }
+
+      lineChars.push(String.fromCharCode(asciiBytes[i]));
+
+      if (len === recordLength) {
+        lines.push(lineChars.join(""));
+        lineChars = [];
+        len = 0;
+
+        if (vb) {
+          recordLength = getRecordLen(i, ebcdicBytes);
+          if (flag < recordLength) {
+            flag = recordLength;
+          }
+          if (recordLength <= 0) break;
+          i += 3; // skip 4 bytes --> 3 + 1 will be added by the for loop
+          len = 3;
+        }
+      }
+    }
+
+    previous += lines.length;
+    numRecords[currentPage + 1] = previous + 1;
+    asciiBytes = [];
+    const returnedLines = [...lines];
+    lines.length = 0;
+    return [[...returnedLines], flag, recordLength];
+  }
+
+  function getRecordLen(index, ebcdicBytes) {
+    var recordLength = 0;
+    if (index + 4 <= ebcdicBytes.length) {
+      recordLength =
+        ((ebcdicBytes[index] & 0xff) << 8) | (ebcdicBytes[index + 1] & 0xff);
+    }
+    return recordLength;
+  }
+
+  const read = (ebcdicBytes, recordLength, startIndex) => {
+    let iterator = 0;
+    let en;
+
+    while (iterator < ebcdicBytes.length) {
+      if (vb) {
+        recordLength = getRecordLen(startIndex, ebcdicBytes);
+      }
+      //what if reclength 0 ?????
+
+      en = startIndex + recordLength;
+      if (en <= ebcdicBytes.length && recordLength>0) {
+        iterator += recordLength;
+      } else {
+        dataSize += iterator;
+        start = dataSize;
+        end = start + maxChunkSize;
+        break;
+      }
+      startIndex = iterator;
+    }
+
+    //when recLen is 0??????
+
+    return [ebcdicBytes.slice(0, iterator), iterator];
+  };
+
+  const handler = (fileBlob,recLen) => {
+    let promise = new Promise(getBuffer(fileBlob));
+    // Wait for promise to be resolved, or log error.
+    promise
+      .then(function (data) {
+        let output;
+
+        st[currentPage] = start;
+        ed[currentPage] = end;
+        let [dataRec] = read(data, recLen, 0);
+
+        let [lines] = convert2Ascii(dataRec, recLen);
+
+        dataRec = null;
+        output = "";
+
+        for (let j = 0; j < lines.length; j++) {
+          output += lines[j] + "\n";
+        }
+
+        lines.length = 0;
+        setFileContent(output);
+        lines = [];
+        // loadPage(output);
+        currentPage += 1;
+      })
+      .catch(function (err) {});
+
+    function getBuffer(fileData) {
+      return function (resolve) {
+        let reader = new FileReader();
+        reader.readAsArrayBuffer(fileData.slice(start, end));
+        // reader.readAsArrayBuffer(fileData);
+        reader.onload = function () {
+          resolve(new Uint8Array(reader.result));
+        };
+      };
+    }
+  };
+
+  const handleFileUpload = (fileData, recLen,flType) => {
+
+        let fd = fileData[0];
+        let rl=Number(recLen)
+        setFileBlob(fd);
+        setRecLength(rl)
+        if (flType == 'fb'){ vb=false;}
+         else {
+          vb = true;
+          }
+        handler(fd,rl);
+  };
+
+  // const handleSaveFile = () => {
+  //   const blob = new Blob([fileContent], { type: "text/plain;charset=utf-8" });
+  //   saveAs(blob, "uploaded-file.txt");
+  // };
+
+  useEffect(() => {
+    const loadPage = () => {
+      if (fileContent !== "" && fileContent != "   \n") {
+        editorRef.current.editor.session.setValue("abcd"); // clearing the editor content
+        if (scrollEnd === 1) {
+          // user is at chunk 1
+          //initial
+          setChunks((oldChunks) => [...oldChunks, fileContent]);
+        } else if (scrollEnd === 2) {
+          // user is at chunk 2
+          //scroll thumb near to bottom
+          if (chunks.length < chunkSize) {
+            setChunks((oldChunks) => [...oldChunks, fileContent]);
+          } else {
+            counter += 2;
+            setChunks((oldChunks) => [oldChunks[2], fileContent]);
+            editorRef.current.editor.setOption(
+              "firstLineNumber",
+              numRecords[counter]
+            );
+          }
+        } else if (scrollEnd == 3) {
+          //scroll thumb is moving upside=>what to do????
+        }
+
+        setFileContent("");
+      }
+    };
+
+    loadPage();
+  }, [fileContent]);
+
+  // useEffect(() => {
+  //   // Update editor options when vb changes
+  //   if (!vb) {
+  //     editorRef.current.editor.session.setOption("wrap", max + 3);
+  //   } else {
+  //     editorRef.current.editor.session.setOption("wrap", max);
+  //   }
+  // }, [ max]);
+
+  function debounce(method, delay) {
+    clearTimeout(method._tId);
+    method._tId = setTimeout(function () {
+      method();
+    }, delay);
+  }
+
+  const handleScroll = () => {
+    const editor = editorRef.current.editor;
+    const scrollTop = editor.getSession().getScrollTop();
+
+    // const scrollHeight = editor.getSession().getDocument().getLength() * editor.renderer.lineHeight;
+    const scrollHeight =
+      editor
+        .getSession()
+        .documentToScreenPosition(
+          editor.getSession().getDocument().getLength(),
+          0
+        ).row *
+        editor.renderer.lineHeight +
+      editor.renderer.scrollBar.getWidth();
+    const viewHeight = editor.renderer.$size.height;
+
+    if (scrollTop + viewHeight >= scrollHeight - 200) {
+      // User is near the bottom, load the next page
+      // loadPage(1);
+
+      scrollEnd = 2;
+      handler(fileBlob,recLength);
+    }
+
+    // } else if (scrollTop === 0 && currentPage > 1) {
+    //   // User is near the top and scrolling up, load the previous page
+    //   setCurrentPage((prevPage) => prevPage - 1);
+    //   //need to see once
+
+    // }
+  };
+
+  return (
+    <div style={{ paddingRight: 0, width: "100%" }}>
+      <NavBar handler={handleFileUpload} />
+
+      <div id="editor">
+        {/* <button onClick={() => {
+          setChunks([]);
+          handler(fileBlob)
+        }}>next chunk</button> */}
+        {/* <div style={{height: "70vh", width: "100%", overflow: "scroll"}} >
+          <textarea onScroll={() => debounce(handleScroll, 2000)} style={{width: "100%", height: "100%"}} value={chunks.join("")} />
+        </div> */}
+        <AceEditor
+          mode="asciidoc"
+          highlightActiveLine={true}
+          // value={pages.join("")} // Combine the content of all loaded pages
+          value={chunks.join("")} // Combine the content of all loaded pages
+          showPrintMargin={false}
+          scrollMargin={true}
+          height="93.6vh"
+          width="100%"
+          fontSize={18}
+          ref={editorRef}
+          onScroll={() => {if(start>33){debounce(handleScroll, 2000)}}}
+          // editorProps={{ $blockScrolling: Infinity }}
+          setOptions={{
+            enableBasicAutocompletion: true,
+            enableLiveAutocompletion: true,
+            showLineNumbers: true,
+            useWorker: false,
+          }}
+        />
+      </div>
+    </div>
+  );
+};
+export default FileEditor;
